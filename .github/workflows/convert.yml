@@ -1,20 +1,26 @@
 name: video-convert-auto
 
+# एक ही समय में सिर्फ एक रन चलेगा (ओवरलैप बंद)
+concurrency:
+  group: video-convert-auto
+  cancel-in-progress: false
+
 on:
   schedule:
-    - cron: "*/30 * * * *"   # हर 5 मिनट में चलेगा
-  workflow_dispatch:        # manual trigger भी मिलेगा
+    - cron: "*/30 * * * *"   # हर 30 मिनट में automatic run
+  workflow_dispatch:        # Manual run (जब चाहो)
 
 jobs:
   convert:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install tools
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y handbrake-cli
+          sudo apt-get install -y ffmpeg
           python3 -m pip install --upgrade pip
           pip3 install gspread google-auth google-auth-oauthlib google-auth-httplib2 requests
 
@@ -32,5 +38,5 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           BATCH_SIZE: ${{ secrets.BATCH_SIZE }}
         run: |
-          echo "Running worker.py from .github/workflows folder"
+          echo "Running worker..."
           python3 .github/workflows/worker.py
