@@ -2,7 +2,7 @@ name: video-convert-auto
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # हर 5 मिनट में चलेगा
+    - cron: "*/30 * * * *"   # हर 5 मिनट में चलेगा
   workflow_dispatch:        # manual trigger भी मिलेगा
 
 jobs:
