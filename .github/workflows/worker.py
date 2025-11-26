@@ -37,13 +37,27 @@ def download_drive(file_id,out):
         for c in r.iter_content(1024*1024):
             if c: f.write(c)
 
-def convert_with_handbrake(inp,out):
+def convert_with_ffmpeg(inp, out):
+    """
+    Convert using ffmpeg to H.264 + AAC-LC, web-optimized.
+    Uses veryfast preset for speed. Adjust -crf for quality/speed tradeoff.
+    """
     cmd = [
-        "HandBrakeCLI","-i",inp,"-o",out,
-        "-e","x264","-q","22",
-        "--aencoder","av_aac","--mixdown","stereo",
-        "--arate","44.1","--ab","128","--optimize"
+        "ffmpeg",
+        "-y",
+        "-i", inp,
+        "-c:v", "libx264",
+        "-preset", "veryfast",
+        "-crf", "23",
+        "-vf", "fps=30,format=yuv420p",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-ar", "44100",
+        "-movflags", "+faststart",
+        "-threads", "0",
+        out
     ]
+    # Run and raise on error
     subprocess.run(cmd, check=True)
 
 def tg_upload(path):
@@ -52,7 +66,7 @@ def tg_upload(path):
         r = requests.post(url, data={"chat_id": CHAT_ID}, files={"video": f}, timeout=300)
     j = r.json()
     if not j.get("ok"):
-        # fallback
+        # fallback to sendDocument
         with open(path,"rb") as f:
             r2 = requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendDocument",
                                 data={"chat_id": CHAT_ID}, files={"document": f}, timeout=300)
@@ -85,13 +99,16 @@ def process_row(idx, row):
     try:
         download_drive(file_id, in_path)
         ws.update_cell(idx+1, 6, "CONVERT")
-        convert_with_handbrake(in_path, out_path)
+        # use ffmpeg conversion (replaced HandBrake)
+        convert_with_ffmpeg(in_path, out_path)
         ws.update_cell(idx+1, 6, "UPLOAD")
         public_url = tg_upload(out_path)
         ws.update_cell(idx+1, 7, public_url)
         ws.update_cell(idx+1, 6, "DONE")
     except Exception as e:
-        ws.update_cell(idx+1, 6, "ERROR: "+str(e)[:250])
+        # write a concise error to sheet for debugging
+        err_text = str(e)
+        ws.update_cell(idx+1, 6, "ERROR: "+err_text[:250])
     finally:
         for p in (in_path,out_path):
             try: os.remove(p)
